@@ -1,0 +1,64 @@
+---
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+
+```{r}
+if(!require(dplyr)) install.packages("dplyr")
+library(dplyr)
+```
+
+Assignment_1
+
+1. Download a dataset from the web
+```{r}
+url<-"https://raw.githubusercontent.com/Opensourcefordatascience/Data-sets/refs/heads/master/blood_pressure.csv"
+patientsdata<-read.csv(url)
+```
+
+2.Check the data import
+```{r}
+head(patientsdata)
+str(patientsdata)
+summary(patientsdata)
+```
+3. Descripltive statistics
+```{r}
+summary(patientsdata$bp_before)
+summary(patientsdata$bp_after)
+table(patientsdata$sex)
+table(patientsdata$agegrp)
+```
+4. Transforming variables
+```{r}
+patientsdata<-patientsdata %>%
+  mutate(agegrp_2=recode(agegrp,"30-45"="Young","46-59"="Middle Age","60+"="Seniors"))
+table(patientsdata$agegrp_2)
+```
+
+5. Charts
+Histogram
+```{r}
+hist(patientsdata$bp_after,
+     main="Histogram of Patients BP after",
+     xlab="BP After",
+     col="green")
+```
+
+
+Scatter plot
+
+
+```{r}
+plot(patientsdata$bp_before,patientsdata$bp_after,
+     main="Scatter plot of BP Before Vs BP After",
+     ylab="BP After",
+     xlab="BP Before",
+     col="blue",
+     pch=15
+)
+```
+
+
