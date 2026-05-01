@@ -1,0 +1,269 @@
+---
+title: "Assignment_2"
+author: "Keerthi Priya Jakku"
+date: "2026-02-18"
+output: 
+  pdf_document:
+    latex_engine: lualatex
+---
+
+Necessary packages
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(lattice)
+library (caret)
+library(class)
+
+set.seed(123)
+
+```
+
+
+Load Data
+```{r}
+UniversalBank<-read.csv("~/Desktop/R documents/Assignment files/FML_Assignment2/UniversalBank.csv")
+```
+
+
+Converting Education to Dummy variable
+
+```{r}
+UniversalBank$Education <- as.factor(UniversalBank$Education)
+
+dummy_model <- dummyVars(~ Education, data = UniversalBank)
+dummy_data <- predict(dummy_model, newdata = UniversalBank)
+
+UniversalBank <- UniversalBank[, !colnames(UniversalBank) %in% "Education"]
+UniversalBank <- cbind(UniversalBank, dummy_data)
+
+```
+
+
+Excluding ID and Zip Code
+```{r}
+UniversalBank<- UniversalBank[, !(names(UniversalBank) %in% c("ID", "ZIP.Code"))]
+```
+
+Converting Personal Loan to factor
+```{r}
+UniversalBank$Personal.Loan <- as.factor(UniversalBank$Personal.Loan)
+
+```
+
+
+Renaming the column names
+```{r}
+colnames(UniversalBank)[colnames(UniversalBank) == "EducationEducation_1"] <- "Education_1"
+colnames(UniversalBank)[colnames(UniversalBank) == "EducationEducation_2"]<- "Education_2"
+colnames(UniversalBank)[colnames(UniversalBank) == "EducationEducation_3"]<- "Education_3"
+```
+
+
+
+Partitioning the data into training (60%) and validaƟon (40%) sets
+```{r}
+indextrain<-createDataPartition(UniversalBank$Personal.Loan,
+                                p=0.6,
+                                list=FALSE)
+training<-UniversalBank[indextrain, ]
+validation<- UniversalBank[-indextrain, ]
+```
+
+
+Seperating predictors and target
+```{r}
+trainingX <- training[, !colnames(training) %in% "Personal.Loan"]
+trainingY <- training$Personal.Loan
+
+validationX <- validation[, !colnames(validation) %in% "Personal.Loan"]
+validationY <- validation$Personal.Loan
+```
+
+
+
+
+Convert predictors to numeric
+```{r}
+
+trainingX <- data.frame(lapply(trainingX, as.numeric))
+validationX <- data.frame(lapply(validationX, as.numeric))
+
+```
+
+
+Standardizing the data for k-NN classification
+```{r}
+prepro <- preProcess(trainingX, method = c("center", "scale"))
+
+trainingX_scaled <- predict(prepro, trainingX)
+validationX_scaled <- predict(prepro, validationX)
+```
+
+
+
+K-NN Classification Using K = 1
+```{r}
+Predicted_KNN1 <- knn(train = trainingX_scaled,
+                      test = validationX_scaled,
+                      cl = trainingY,
+                      k = 1)
+
+confusionMatrix(Predicted_KNN1, validationY, positive = "1")
+```
+
+Finding the best K
+```{r}
+accuracy <- c()
+
+for(i in 1:20){
+  pred <- knn(train = trainingX_scaled,
+              test = validationX_scaled,
+              cl = trainingY,
+              k = i)
+  
+  accuracy[i] <- mean(pred == validationY)
+}
+
+accuracy_table <- data.frame(
+  k = 1:10,
+  Accuracy = round(accuracy, 6)
+)
+
+print(accuracy_table)
+
+accuracy
+best_k <- which.max(accuracy)
+best_k
+```
+
+
+
+New customer data
+
+```{r}
+new_customer <- data.frame(
+  Age = 40,
+  Experience = 10,
+  Income = 84,
+  Family = 2,
+  CCAvg = 2,
+  Mortgage = 0,
+  Securities.Account = 0,
+  CD.Account = 0,
+  Online = 1,
+  CreditCard = 1,
+  Education.1 = 0,
+  Education.2 = 1,
+  Education.3 = 0
+)
+
+new_customer_scaled <- predict(prepro, new_customer)
+
+knnpredict <- knn(train = trainingX_scaled,
+              test = new_customer_scaled,
+              cl= trainingY,
+              k = best_k)
+
+knnpredict
+```
+Outcome: New Customer will not accept the Personal Loan
+
+
+
+
+K-NN Classification Using k = 2
+```{r}
+Predicted_KNN2 <- knn(train = trainingX_scaled,
+                      test = validationX_scaled,
+                      cl = trainingY,
+                      k = 2)
+
+conf_matrix_k2 <- confusionMatrix(Predicted_KNN2, validationY, positive = "1")
+conf_matrix_k2
+
+prediction2 <- knn(trainingX_scaled,
+                   new_customer_scaled,
+                   cl = trainingY,
+                   k = 2)
+```
+
+
+Confusion Matrix Using  k=2
+```{r}
+knn_k2 <- knn(train = trainingX_scaled,
+              test = validationX_scaled,
+              cl = trainingY,
+              k = 2)
+
+conf_matrix_k2 <- confusionMatrix(knn_k2, validationY, positive = "1")
+conf_matrix_k2
+```
+
+
+
+
+
+Dividing the data (50% training / 30% validation / 20% training)
+
+```{r}
+indextrain2 <- createDataPartition(UniversalBank$Personal.Loan,
+                                    p = 0.5,
+                                    list = FALSE)
+
+train2 <- UniversalBank[indextrain2, ]
+temp <- UniversalBank[-indextrain2, ]
+
+index_valid2 <- createDataPartition(temp$Personal.Loan,
+                                    p = 0.6,
+                                    list = FALSE)
+
+valid2 <- temp[index_valid2, ]
+test2 <- temp[-index_valid2, ]
+```
+
+
+Seperate predictors and target
+
+```{r}
+train2X <- data.frame(lapply(train2[, !colnames(train2) %in% "Personal.Loan"], as.numeric))
+train2Y <- train2$Personal.Loan
+
+valid2X <- data.frame(lapply(valid2[, !colnames(valid2) %in% "Personal.Loan"], as.numeric))
+valid2Y <- valid2$Personal.Loan
+
+test2X <- data.frame(lapply(test2[, !colnames(test2) %in% "Personal.Loan"], as.numeric))
+test2Y <- test2$Personal.Loan
+
+```
+
+
+Scale predictors
+```{r}
+prepro2 <- preProcess(train2X, method = c("center", "scale"))
+train2X_scaled <- predict(prepro2, train2X)
+valid2X_scaled <- predict(prepro2, valid2X)
+test2X_scaled <- predict(prepro2, test2X)
+
+```
+
+
+k-nn predictions
+```{r}
+train2_pred <- knn(train2X_scaled, train2X_scaled, train2Y, k = best_k)
+valid2_pred <- knn(train2X_scaled, valid2X_scaled, train2Y, k = best_k)
+test2_pred <- knn(train2X_scaled, test2X_scaled, train2Y, k = best_k)
+
+```
+
+
+Confusion matrices
+```{r}
+confusionMatrix(train2_pred, train2Y, positive = "1")
+confusionMatrix(valid2_pred, valid2Y, positive = "1")
+confusionMatrix(test2_pred, test2Y, positive = "1")
+```
+
+Analysis: Thes dataset was split into 60% training and 40% validation sets after converting the Education variable into dummy variables and removing ID and ZIP code. When k = 1 was used, the model achieved a validation accuracy of about 96.45%, and the new customer was predicted as 0, meaning they are unlikely to accept the  loan. After testing different k values from 1 to 20, k = 1 gave the highest accuracy and was chosen as the best value. However, k = 2 was also tested to reduce possible overfitting. Although its accuracy was slightly lower (around 95–96%), the performance was still good and the new customer was again classified as 0. When the data was repartitioned into 50% training, 30% validation, and 20% test sets, the training accuracy was very high while the validation and test accuracies were both around 95%. This suggests that k = 1 may slightly overfit the training data, while k = 2 provides a more stable model. Overall, the k-NN model performs well in predicting loan acceptance, and the customer is predicted not to accept the loan.
+ 
