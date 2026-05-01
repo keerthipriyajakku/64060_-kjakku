@@ -1,0 +1,227 @@
+
+---
+
+title: "Assignment 3"
+author: "Jakku Keerthi Priya"
+date: "2026-03-03"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+Necessary Packages
+```{r}
+library(caret)
+library(e1071)
+set.seed(123)
+```
+
+
+Load Data
+```{r}
+UniversalBank<-read.csv("~/Desktop/R documents/Assignment files/FML_Assignment2/UniversalBank.csv")
+```
+
+
+```{r}
+head(UniversalBank)
+```
+
+
+Summary of Data
+
+```{r}
+summary(UniversalBank)
+```
+
+
+Partitioning the data into training (60%) and validaƟon (40%) sets
+
+```{r}
+indextrain<- createDataPartition(UniversalBank$Personal.Loan, p=0.6, list=FALSE)
+
+training<- UniversalBank[indextrain, ]
+
+validation<- UniversalBank[-indextrain, ]
+
+```
+
+
+
+Create a pivot table
+
+```{r}
+  pivot_table <- table(CreditCard=training$CreditCard, PersonalLoan=training$Personal.Loan,Online=training$Online)
+  
+  pivot_table
+```
+
+
+Calculating probability
+
+```{r}
+loan_accepted_online_CC <- pivot_table["1","1","1"]
+total_CC_online <- sum(pivot_table["1", ,"1" ])
+probability_loanaccepted <- loan_accepted_online_CC/total_CC_online
+probability_loanaccepted
+```
+
+
+
+
+Loan (rows) as a function of Online (columns) : Pivot table
+
+```{r}
+loan_online_pivot  <- table(PersonalLoan = training$Personal.Loan,
+                            Online = training$Online)
+loan_online_pivot
+```
+
+
+Loan (rows) as a function of Credit card (columns) : Pivot table
+
+```{r}
+loan_CC_pivot<- table(PersonalLoan = training$Personal.Loan,
+                        CreditCard = training$CreditCard)
+loan_CC_pivot
+```
+
+
+Compute the following quantities
+
+
+
+1. P(CC = 1 | Loan = 1) (the proportion of credit card holders among the loan acceptors) 
+
+```{r}
+CCholders_loan_accepted <- loan_CC_pivot["1","1"] / sum(loan_CC_pivot["1", ])
+CCholders_loan_accepted
+```
+
+
+
+2. P(Online = 1 | Loan = 1) 
+
+```{r}
+onlineuser_loan_accepted <-  loan_online_pivot["1","1"] / sum(loan_online_pivot["1", ])
+
+onlineuser_loan_accepted
+```
+
+
+
+3. P(Loan = 1) (the proportion of loan acceptors) 
+
+```{r}
+loan_accepted <- sum(training$Personal.Loan == 1) / nrow(training)
+loan_accepted
+
+```
+
+
+
+4. P(CC = 1 | Loan = 0) 
+
+```{r}
+Cardholder_loanrejected <- loan_CC_pivot["0","1"] / sum(loan_CC_pivot["0", ])
+Cardholder_loanrejected
+
+```
+
+
+
+
+5. P(Online = 1 | Loan = 0) 
+
+```{r}
+inactiveuser_loanrejected <- loan_online_pivot["0","1"] / sum(loan_online_pivot["0", ])
+
+inactiveuser_loanrejected
+```
+
+
+
+
+6. P(Loan = 0) 
+
+```{r}
+loan_rejected <- sum(training$Personal.Loan == 0) / nrow(training)
+
+loan_rejected
+```
+
+
+
+
+Naive Bayes probability P(Loan = 1 | CC = 1, Online = 1 )
+
+```{r}
+CCholder_onlineuser <- nrow(training[training$CreditCard == 1 & training$Online  == 1, ]) / nrow(training)
+
+Loanaccepted_CCholder_onlineuser <- (CCholders_loan_accepted*onlineuser_loan_accepted*loan_accepted)/CCholder_onlineuser
+
+Loanaccepted_CCholder_onlineuser
+                            
+                            
+                            
+                            
+```
+
+
+
+
+Comparing the pivot table value with the Naive Bayes Probability
+
+```{r}
+probability_loanaccepted 
+```
+
+```{r}
+Loanaccepted_CCholder_onlineuser
+```
+
+
+
+
+There is a slight differences between the two values. The Pivot table value looks more accurate as it is without any assumptions and Naive Bayes assumes independence between predictors.
+
+
+
+
+
+Naive Bayes model
+
+```{r}
+model <- naiveBayes(Personal.Loan ~ CreditCard + Online, data = training)
+
+predict_probability <- predict(model, training , type = "raw")
+NaiveBayes_probability <- predict_probability[training$CreditCard == 1 & training$Online == 1, 2]
+NaiveBayes_probability
+
+```
+
+
+
+
+
+Analysis:
+Naive Bayes probability is more accurate than the probability form Section E
+because model-derived probability considers distribution and relationship within the data.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
