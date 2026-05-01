@@ -1,0 +1,170 @@
+---
+title: "Assignment_4"
+author: "Keerthi Priya Jakku"
+date: "2026-04-01"
+output: 
+  pdf_document:
+    latex_engine: lualatex
+---
+
+Necessary packages
+```{r}
+library(factoextra)
+library(cluster)
+library(tidyverse)
+```
+
+
+Load Data
+```{r}
+Pharmaceuticals_data<-read.csv("~/Desktop/R documents/Assignment files/FML_Assignment4/Pharmaceuticals.csv")
+```
+
+```{r}
+head(Pharmaceuticals_data)
+```
+
+```{r}
+summary(Pharmaceuticals_data)
+
+```
+
+Selecting Only Numerical Variables (1–9)
+
+```{r}
+pharma_numericaldata <- Pharmaceuticals_data[, 3:11]
+```
+
+```{r}
+colnames(pharma_numericaldata)
+```
+
+
+Normalizing the data
+
+```{r}
+Pharmanumericals_normal <- scale(pharma_numericaldata)
+```
+
+
+Choosing number of clusters using Elbow method
+
+```{r}
+set.seed(123)
+library(factoextra)
+fviz_nbclust(Pharmanumericals_normal, kmeans, method = "wss")
+```
+
+
+```{r}
+fviz_nbclust(Pharmanumericals_normal, kmeans, method = "silhouette")
+```
+The optimal k=2
+
+K-mean clustering
+```{r}
+kmeans_result <- kmeans(Pharmanumericals_normal, centers = 2, nstart = 25)
+kmeans_result
+```
+
+Visualizing
+```{r}
+fviz_cluster(kmeans_result, data = Pharmanumericals_normal)
+```
+The cluster plot gives two clusters with the sizes 11 and 10.
+
+
+
+```{r}
+wss_clusters<-kmeans_result$cluster
+dfl<-cbind(Pharmaceuticals_data,wss_clusters)
+```
+
+```{r}
+wss_table<-aggregate(dfl[,-c(1:2,12:14)], by=list(dfl$wss_clusters),FUN="median")
+print(wss_table[,-1])
+```
+Recommendations
+```{r}
+wss_summary <- table(dfl$wss_clusters, dfl$Median_Recommendation)
+names(dimnames(wss_summary)) <- c("Cluster", "Recommendation")
+wss_summary <- addmargins(wss_summary)
+wss_summary
+```
+
+```{r}
+ggplot(dfl, aes(x = Median_Recommendation, fill = Median_Recommendation)) +
+  geom_bar() +
+  facet_wrap(~ wss_clusters) +
+  labs(title = "Recommendation by Cluster", x = "Recommendation", y = "Count")
+```
+
+
+
+Locations
+```{r}
+wss_location <- table(dfl$wss_clusters, dfl$Location)
+names(dimnames(wss_location)) <- c("Cluster", "Location")
+wss_location  <- addmargins(wss_location)
+wss_location 
+```
+
+
+```{r}
+
+ggplot(dfl, aes(x = wss_clusters, fill = Location)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Location by Cluster", x = "Cluster", y = "Count")
+```
+
+
+```{r}
+wss_exchange <- table(dfl$wss_clusters, dfl$Exchange)
+names(dimnames(wss_exchange)) <- c("Cluster", "Exchange")
+wss_exchange <- addmargins(wss_exchange)
+wss_exchange
+
+```
+
+```{r}
+ggplot(dfl,aes(x=wss_clusters, fill=Exchange))+geom_bar()
+```
+
+
+Analysis:
+1. Both the elbow and Silhoutte methods determined k=2.
+2. The further analysis is made using the elbow method.
+3. Recommendations: Cluster 1 shows that most firms have a hold recommendations and Cluster 2 has firms giving more moderate buy.The buy recommendations are "0" for cluster 1. 
+4. Location: Cluster 1 is dominated by US based firms with 8 from US, 2 firms from UK and 1 from Switzerland.Cluster 2 is more diverse. This shows the smaller growth phase pharma companies are wide spread across multiple countries.
+5.All 11 firms in Cluster 1 are listed exclusively on NYSE. Cluster 2, most firms (8 out of 10) are also on NYSE, but 1 firm is listed on NASDAQ and 1 on AMEX.
+
+
+
+Naming of Clusters
+
+Cluster:1 Established Pharma companies: 
+These firms are large, financially strong, highly profitable and stable with high market cap, strong ROE and ROA, low leverage and the stock prices look stable. Most of the firms are based of US and are listed on NYSE.
+
+Cluster:2 Emerging Pharma companies
+The cluster has firms with low market cap but high revenue, leverage and lower profitability metrics. They are geographically diverse and receive moderate buy recommendations, indicating their growth potential in the future.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
