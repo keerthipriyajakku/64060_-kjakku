@@ -1,0 +1,347 @@
+---
+title: "Final Project"
+author: "Keerthi Priya Jakku"
+date: "2026-04-29"
+output: 
+  pdf_document:
+    latex_engine: lualatex
+---
+
+
+Necessary packages
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(class)
+library(tidyverse)
+library(e1071)
+library(gmodels)
+library(corrplot)
+library(pROC)
+```
+
+Load Data
+```{r}
+fraudtrain_raw<-read.csv("~/Desktop/R documents/Assignment files/FML_Final project/fraudTrain.csv")
+```
+
+```{r}
+head(fraudtrain_raw)
+```
+
+```{r}
+summary(fraudtrain_raw)
+```
+
+```{r}
+dim(fraudtrain_raw)
+```
+
+Data Preparation and Sampling
+```{r}
+set.seed(123)
+frauddata_sample <- fraudtrain_raw[sample(nrow(fraudtrain_raw), 10000), ]
+```
+
+A random sample of 10,000 transactions was selected from the original 1,296,675 records for computational efficiency.
+
+
+```{r}
+dim(frauddata_sample)
+```
+```{r}
+colnames(frauddata_sample)
+```
+Selecting columns
+```{r}
+fraud <- frauddata_sample[, c("amt", "gender", "category", "city_pop", "is_fraud")]
+```
+Five variables were selected that are most relevant for fraud detection — transaction amount, gender, merchant category, city population and fraud label to avoid noise.
+
+
+```{r}
+Missing_Data <- colMeans(is.na(fraud))
+Missing_Data
+```
+No missing data
+
+Number of fraud and non fraud (Fraud=1 and non-fraud=0)
+```{r}
+table(fraud$is_fraud)
+
+```
+
+Class distribution visual representation
+```{r}
+fraud$is_fraud_label <- ifelse(fraud$is_fraud == 1, "Fraud", "Legitimate")
+count_of_fraud <- table(fraud$is_fraud_label)
+
+pie(count_of_fraud,
+    col = c("red", "darkgreen"),
+    main = "Fraud Transactions vs Legitimate Transactions",
+    labels = paste(names(count_of_fraud), "\n", count_of_fraud))
+```
+
+Fraud pattern using transation amount
+```{r}
+hist(fraud$amt,
+     col = "steelblue",
+     main = "Distribution of Transaction Amounts",
+     xlab = "Transaction Amount ($)",
+     breaks = 40,
+     xlim = c(0, 1000))
+```
+
+Transforming Data
+```{r}
+fraud$gender   <- ifelse(fraud$gender == "M", 1, 0)
+fraud$category <- as.numeric(as.factor(fraud$category))
+fraud$is_fraud <- as.factor(fraud$is_fraud)
+```
+
+Normalizing data 
+```{r}
+fraud$amt <- (fraud$amt - min(fraud$amt)) / (max(fraud$amt) - min(fraud$amt))
+
+head(fraud)
+```
+
+```{r}
+fraud$is_fraud_label <- NULL
+```
+
+
+```{r}
+fraud_correlation <- fraud
+fraud_correlation$is_fraud <- as.numeric(as.character(fraud_correlation$is_fraud))
+
+correlation_matrix <- cor(fraud_correlation)
+corrplot(correlation_matrix, 
+         method = "circle",
+         title  = "Correlation Matrix",
+         mar    = c(0,0,1,0))
+correlation_matrix
+```
+
+
+
+
+
+Partitioning Data into Training (70%) and Testing (30%)
+```{r}
+set.seed(123)
+index_training <- createDataPartition(fraud$is_fraud, p = 0.7, list = FALSE)
+
+training <- fraud[index_training, ]
+testing  <- fraud[-index_training, ]
+
+```
+
+KNN Model
+```{r}
+training_predictors <- training[, c("amt", "gender", "category", "city_pop")]
+testing_predictors  <- testing[, c("amt", "gender", "category", "city_pop")]
+training_labels <- training$is_fraud
+testing_labels  <- testing$is_fraud
+```
+
+
+Finding the best K
+```{r}
+accuracy <- c()
+
+for(i in 1:10){
+  predict <- knn(train = training_predictors,
+              test  = testing_predictors,
+              cl    = training_labels,
+              k     = i)
+  accuracy[i] <- mean(predict == testing_labels)
+}
+
+accuracy
+```
+
+```{r}
+best_k <- which.max(accuracy)
+best_k
+```
+best k=3
+
+KNN prediction using k=3
+```{r}
+predicted_knn <- knn(train = training_predictors,
+                     test  = testing_predictors,
+                     cl    = training_labels,
+                     k     = best_k)
+
+predicted_knn
+```
+
+
+```{r}
+confusionMatrix(predicted_knn, testing_labels, positive = "1")
+```
+
+
+Class imbalance - KNN with balanced data
+```{r}
+set.seed(123)
+fraud_cases       <- fraud[fraud$is_fraud == 1, ]
+legitamate_cases  <- fraud[fraud$is_fraud == 0, ]
+legitamate_sample <- legitamate_cases[sample(nrow(legitamate_cases), 100), ]
+fraud_balanced    <- rbind(fraud_cases, legitamate_sample)
+
+
+index_training2 <- createDataPartition(fraud_balanced$is_fraud, p = 0.7, list = FALSE)
+training2 <- fraud_balanced[index_training2, ]
+testing2  <- fraud_balanced[-index_training2, ]
+
+
+training_predictors2 <- training2[, c("amt", "gender", "category", "city_pop")]
+testing_predictors2  <- testing2[, c("amt", "gender", "category", "city_pop")]
+training_labels2 <- training2$is_fraud
+testing_labels2  <- testing2$is_fraud
+accuracy <- c()
+
+accuracy2 <- c()
+
+for(i in 1:10){
+  pred2 <- knn(train = training_predictors2,
+               test  = testing_predictors2,
+               cl    = training_labels2,
+               k     = i)
+  accuracy2[i] <- mean(pred2 == testing_labels2)
+}
+
+accuracy2
+
+best_k2 <- which.max(accuracy2)
+best_k2
+```
+
+
+```{r}
+predicted_knn2 <- knn(train = training_predictors2,
+                      test  = testing_predictors2,
+                      cl    = training_labels2,
+                      k     = best_k2)
+```
+
+Confusion matrix with balanced data
+```{r}
+confusionMatrix(predicted_knn2, testing_labels2, positive = "1")
+```
+
+Naive Bayes approach
+```{r}
+naivebayes_model <- naiveBayes(is_fraud ~ ., data = training)
+naivebayes_model
+```
+
+
+Prediction using Naive Bayes
+```{r}
+predicted_naivebayes <- predict(naivebayes_model, testing)
+predicted_naivebayes
+```
+Confusion matrix
+```{r}
+confusionMatrix(predicted_naivebayes, testing_labels, positive = "1")
+```
+
+```{r}
+predicted_nb_probability <- predict(naivebayes_model, testing, type = "raw")
+
+```
+
+```{r}
+head(predicted_nb_probability)
+```
+Model Performance Comparison Using ROC Curve
+```{r}
+roc_naivebayes  <- roc(testing$is_fraud, predicted_nb_probability[, "1"])
+roc_knn <- roc(testing_labels2,  as.numeric(as.character(predicted_knn2)))
+
+plot(roc_naivebayes,  col = "red",  main = "ROC Curve - KNN vs Naive Bayes")
+plot(roc_knn, col = "darkgreen", add = TRUE)
+legend("bottomright",
+       legend = c(paste("Naive Bayes AUC =", round(auc(roc_naivebayes), 3)),
+                  paste("KNN AUC =",         round(auc(roc_knn), 3))),
+       col = c("red", "darkgreen"), lwd = 2)
+```
+
+Models Comparision table
+
+```{r}
+comparison <- data.frame(
+  Model = c("KNN", "Naive Bayes"),
+  Accuracy= c("59.57%", "98.13%"),
+  Sensitivity= c("29.41%", "52.94%"),
+  Specificity = c("76.67%", "98.39%"),
+  AUC= c("0.530", "0.877")
+)
+
+comparison
+```
+
+Visulalization of the Comparision
+```{r}
+barplot(c(59.57, 98.13),
+        names.arg = c("KNN", "Naive Bayes"),
+        col = c("steelblue", "orange"),
+        main = "Accuracy Comparison",
+        ylab = "Accuracy (%)",
+        ylim = c(0, 100))
+```
+
+```{r}
+barplot(c(29.41, 52.94),
+        names.arg = c("KNN", "Naive Bayes"),
+        col = c("steelblue", "orange"),
+        main = "Sensitivity Comparison",
+        ylab = "Sensitivity (%)",
+        ylim = c(0, 100))
+```
+
+
+
+Analysis:
+
+1.The original dataset contains 1,296,675 real credit card transactions. Due to the computational limitations of processing such a large dataset in R, a random sample of 10,000 transactions were taken for the analysis. Only 59 out of 10,000 transactions are fraudulent (0.59%), confirming the severe class imbalance typical of real world fraud data.The pie chart confirms the class imbalance, legitimate transactions dominating the dataset.
+
+2.Most transactions are of small amounts with very few exceeding $500.
+
+3.Transaction amount was normalized to a 0-1 scale to prevent it from dominating the KNN model.The amounts shows a strongest correlation with fraud compared to other variables.
+
+4.The class imbalance caused the KNN to predict all transactions to be legitimate and failed to detect fraud. To address the imbalance, balanced dataset was created using all 59 fraudulent and 100 randomly sampled legitimate transactions.
+
+5.Naive Bayes was applied to the full 10,000 transaction dataset without requiring balancing and achieved an accuracy of 98.13% and sensitivity of 52.94%, successfully identifying 9 out of 17 fraudulent transactions.This approach also provides a fraud probability score for each transaction, which can be used by banks to prioritize fraud investigations.
+
+6.Naive Bayes AUC of 0.877 significantly outperforms KNN AUC of 0.530, confirming Naive Bayes as the superior model outperforming  KNN across all metrics — accuracy, sensitivity, specificity and AUC.
+
+Findings:
+The aim is to  detect fraudulent credit card transactions using the KNN and Naive Bayes Machine learning techniques. The severe class imbalance presented a significant challenge, particularly for KNN, which failed to detect any fraud when applied to the full dataset. After addressing the imbalance through undersampling, KNN achieved an accuracy of 59.57% and a sensitivity of 29.41%, identifying only 5 out of 17 fraudulent transactions in the testing set. Naive Bayes was applied directly to the full 10,000 transaction dataset without requiring any balancing and achieved a significantly higher accuracy of 98.13% and sensitivity of 52.94%, successfully identifying 9 out of 17 fraudulent transactions. The ROC curve further confirmed Naive Bayes as the superior model.
+
+Based on these findings, Naive Bayes is recommended as the more effective model for real world credit card fraud detection, as it handles class imbalance naturally and provides probability scores that banks can use to prioritize fraud investigations and protect customers from financial losses.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
