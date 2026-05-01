@@ -1,0 +1,274 @@
+---
+title: "Assignment_5"
+author: "Keerthi Priya Jakku"
+date: "2026-04-23"
+output: 
+  pdf_document:
+    latex_engine: lualatex
+---
+
+Necessary packages
+```{r}
+library(stats)
+library(factoextra)
+library(cluster)
+library(readr)
+library(ggplot2)
+```
+
+
+Load Data
+```{r}
+cereals<-read.csv("~/Desktop/R documents/Assignment files/FML_Assignment 5/Cereals.csv")
+```
+
+```{r}
+head(cereals)
+```
+
+Removing missing values
+```{r}
+cereals <- na.omit(cereals)
+
+```
+
+
+Normalizing data
+```{r}
+numeric <-sapply(cereals, is.numeric)
+cereals_numeric <- cereals[, numeric]
+cereals_normalized <- scale(cereals_numeric)
+cereals_normalized <- as.data.frame(cereals_normalized)
+```
+
+
+```{r}
+categorical_col <- cereals[, 1:3]
+cereals_numericalscol <- cereals_normalized[, 1:13]
+cereals_final <- cbind(categorical_col, cereals_numericalscol)
+cereals_final <- as.data.frame(cereals_final)
+cereals_final <- na.omit(cereals_final)
+```
+
+
+
+```{r}
+infinite_values <- sapply(cereals_final, function(x) any(is.infinite(x)))
+total_infinite_values <- sum(infinite_values)
+if (total_infinite_values > 0) {
+  cat("There are", total_infinite_values, "columns with infinite values in the dataset.\n")
+} else {
+  cat("No infinite values found in the dataset.\n")
+}
+```
+
+```{r}
+nan_columns <- sapply(cereals_final, function(x) any(is.nan(x)))
+total_nancolumns <- sum(nan_columns)
+if (total_nancolumns > 0) {
+  cat("There are", total_nancolumns, "columns with NaN values in the dataset.\n")
+} else {
+  cat("No NaN values found in the dataset.\n")
+}
+```
+
+
+Hierarchial Clustering using Euclidean distance
+
+```{r}
+rownames(cereals_normalized) <- categorical_col[, 1]
+distance <- dist(cereals_normalized, method= "euclidean")
+Hierarchialclustering <- hclust(distance, method = "complete")
+```
+```{r}
+plot (Hierarchialclustering, cex = 0.5, hang= -1)
+```
+
+Using Agnes
+
+```{r}
+agnes_single <- agnes(cereals_normalized, metric = "euclidean", method = "single")
+agnes_complete <- agnes(cereals_normalized, metric = "euclidean", method = "complete")
+agnes_average <- agnes(cereals_normalized, metric = "euclidean", method = "average")
+agnes_ward <- agnes(cereals_normalized, metric = "euclidean", method = "ward")
+```
+
+linkages with Agglomerative Coefficient
+```{r}
+print(agnes_single$ac)
+print(agnes_complete$ac)
+print(agnes_average$ac)
+print(agnes_ward$ac)
+```
+
+
+
+
+```{r}
+pltree(agnes_single, cex=0.5, hang=-1, main= "dendogram")
+
+```
+
+
+
+```{r}
+pltree(agnes_complete, cex=0.5, hang=-1, main= "dendogram")
+```
+
+
+```{r}
+pltree(agnes_average, cex=0.5, hang=-1, main= "dendogram")
+```
+
+
+```{r}
+pltree(agnes_ward, cex=0.5, hang=-1, main= "dendogram")
+```
+
+
+```{r}
+set.seed(123)
+fviz_nbclust(as.data.frame(cereals_normalized), FUN = kmeans, method = "wss")
+
+
+```
+optimal number of clusters k=5
+
+```{r}
+number_of_clusters <- cutree(agnes_ward, k = 5)
+number_clusters <- length(unique(number_of_clusters))
+print(number_clusters)
+```
+
+
+
+Structure of clusters and their stability
+
+Visualization of clusters
+```{r}
+combined_data <- as.data.frame(cbind(cereals_final, number_of_clusters))
+numeric_data  <- combined_data[, sapply(combined_data, is.numeric)]
+fviz_cluster(list(data = numeric_data, cluster = number_of_clusters))
+```
+
+
+
+
+Centroids
+```{r}
+centroids <- t(sapply(unique(number_of_clusters), function(cluster) {
+  colMeans(numeric_data[number_of_clusters == cluster, ])
+}))
+```
+
+
+```{r}
+print(centroids)
+```
+
+Partitions
+
+```{r}
+set.seed(123)
+indices <- sample(nrow(cereals_normalized), size = 0.5 * nrow(cereals_normalized))
+Partition_A <- cereals_normalized[indices, ]
+Partition_B <- cereals_normalized[-indices, ]
+```
+
+```{r}
+agnes_single_A   <- agnes(Partition_A, method = "single")
+agnes_average_A  <- agnes(Partition_A, method = "average")
+agnes_complete_A <- agnes(Partition_A, method = "complete")
+agnes_ward_A     <- agnes(Partition_A, method = "ward")
+```
+
+Partion A - Agglomerative Coefficient
+```{r}
+agnes_single_A$ac
+agnes_average_A$ac
+agnes_complete_A$ac
+agnes_ward_A$ac
+```
+
+
+```{r}
+historicalclustering_A        <- agnes(Partition_A, method = "ward")
+cut_A       <- cutree(historicalclustering_A, k = 5)
+centroids_A <- aggregate(Partition_A, by = list(cut_A), FUN = mean)
+
+assign_Centroid <- function(observation, centroids) {
+  distances <- apply(centroids[, -1], 1, function(centroid) sum((observation - centroid)^2))
+  return(which.min(distances))
+}
+
+cluster_assignments_B <- apply(Partition_B, 1, assign_Centroid, centroids_A)
+
+historicalclustering_full  <- agnes(cereals_normalized, method = "ward")
+cut_full <- cutree(historicalclustering_full, k = 5)
+
+table(cluster_assignments_B, cut_full[-indices])
+```
+Optimal cluster for a healthy cereal
+```{r}
+cereals_healthy   <- cereals[complete.cases(cereals), ]
+agnes_ward_healthy <- agnes(cereals_healthy[, -c(1:3)], method = "ward")
+historicalclustering_ward_healthy   <- as.hclust(agnes_ward_healthy)
+clustering       <- cutree(historicalclustering_ward_healthy, k = 5)
+
+cluster_means <- aggregate(cereals_healthy[, -c(1:3)],
+                           by = list(cluster = clustering), FUN = mean)
+
+
+```
+
+
+
+```{r}
+healthy_cluster_index <- which.max(cluster_means$fiber + cluster_means$protein
+                                   - cluster_means$sugars - cluster_means$fat)
+healthy_cluster <- cluster_means[healthy_cluster_index, ]
+
+
+```
+
+```{r}
+print(cluster_means)
+
+```
+
+```{r}
+print(healthy_cluster_index)
+
+```
+
+```{r}
+print(healthy_cluster)
+```
+
+
+
+
+
+
+Analysis:
+
+1. As the ward linkage method has the highest value with 0.9046042 it is the best method for the cereals data when compared to all the other methods above. It gives balanced clusters and minimizing the variance within each clusters.
+
+2.Cluster 2 has healthy cereals with low fat, low sodium and high protein when compared to all the other clusters.
+
+
+Normalizing data:
+It is important to normalize the data for clustering because the algorithm relies on distance measures between data points. Normalizing ensures that each variable contributes equally when forming clusters. Without normalization, variables with larger scales can have a greater impact on cluster formation and lead to misleading results.
+
+
+
+
+
+
+
+
+
+
+
+
+
